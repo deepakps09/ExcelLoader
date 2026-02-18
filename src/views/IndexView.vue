@@ -7,7 +7,11 @@ import Transform from '@/components/Transform.vue';
 const inputCols = ref([]);
 const targetCols = ref([]);
 const sourceFile = shallowRef(null);
+const rowSlicer = ref({start:1,end:2});
+const totalRows = ref(1);
+const shouldSlice = ref(false);
 const mapping = ref({});
+const isLoading = ref(false);
 
 // {
 //   "target":{
@@ -24,6 +28,7 @@ const mapping = ref({});
 async function onFileLoad(event,inputSource){
     //here, we extract the columns
     let file = event.target.files[0];
+    isLoading.value = true;
     if(file){
       const worker = new Worker(new URL('../worker/readColumns.js', import.meta.url),{type: 'module'});
       const payload = {
@@ -34,6 +39,7 @@ async function onFileLoad(event,inputSource){
           if(inputSource === 'source'){
             sourceFile.value = file;
             inputCols.value = event.data.headers;
+            rowSlicer.value.end = totalRows.value = event.data.rowCount;
           }
           else{
             targetCols.value = event.data.headers;
@@ -52,6 +58,7 @@ async function onFileLoad(event,inputSource){
       }
       worker.postMessage(payload);
     }
+  isLoading.value = false;
 }
 function clearMappings(index){
   mapping.value[index]={
@@ -61,6 +68,10 @@ function clearMappings(index){
     mergeSet: [],
     transformSet: []
   }
+}
+function sliceCheckboxHandler(event){
+  console.log(event.target.checked);
+  shouldSlice.value = event.target.checked;
 }
 
 function getColumnDetails(idx,colType) {
@@ -82,19 +93,23 @@ function downloadBlob(buffer, filename) {
   window.URL.revokeObjectURL(url);
 }
 async function beginMapping(){
+  isLoading.value = true;
   const worker = new Worker(new URL('../worker/processRows.js', import.meta.url),{type: 'module'});
   const payload = {
     mappings: toRaw(mapping.value),
     file: sourceFile.value,
-    targetCols: toRaw(targetCols.value)
+    targetCols: toRaw(targetCols.value),
+    rowSlicer: shouldSlice ? toRaw(rowSlicer.value) : null
   }
   worker.onmessage = function(event){
     if(event.data.error === null){
-      downloadBlob(event.data.buffer,"MappedFile.xlsx");
+      downloadBlob(event.data.buffer,`mapped_file_${Date.now()}.xlsx`);
     }
     else console.log(event.data.error);
+    isLoading.value = false;
   }
   worker.postMessage(payload);
+  
 }
 
 </script>
@@ -112,6 +127,22 @@ async function beginMapping(){
           <label for="fileRight" class="form-label fw-bold">Target template file</label>
           <input class="form-control" @change="onFileLoad($event,'target')" type="file">
         </div>
+      </div>
+      <div class="row">
+        <div class="col-md-6">
+          Slice / Select subset:
+          <input type="checkbox" @change="sliceCheckboxHandler($event)"/>
+        </div>
+        <template v-if="shouldSlice">
+          <div class="col-md-3">
+            Starting row:
+            <input type="number" class="form-control" :min="1" :max="rowSlicer.end" v-model.number="rowSlicer.start" placeholder="Starting row number"/>          
+          </div>
+          <div class="col-md-3">
+            Ending row:
+            <input type="number" class="form-control" :min="rowSlicer.start" :max="totalRows" v-model.number="rowSlicer.end" placeholder="Ending row number"/>
+          </div>
+        </template>
       </div>
     </section>
 
@@ -157,7 +188,10 @@ async function beginMapping(){
                         </div>
 
                     </div>
-                    <button type="button" @click="beginMapping" class="btn btn-primary">Begin</button>
+                    <button class="btn btn-primary" :disabled="isLoading" @click="beginMapping">
+                      <span v-if="isLoading" class="spinner-border spinner-border-sm me-2" role="status"></span>
+                      {{ isLoading ? 'Processing...' : 'Start Mapping' }}
+                    </button>
                     </div>
                 <div v-else>
                     Please upload both source and destination files

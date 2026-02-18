@@ -6,6 +6,7 @@ self.onmessage=async function(event){
     let fileArrayBuf = await event.data.file.arrayBuffer();
     let mappings = event.data.mappings;
     let targetCols = event.data.targetCols;
+    let rowSlicer = event.data.rowSlicer;
 
     let valErrors = [];
 
@@ -15,17 +16,18 @@ self.onmessage=async function(event){
         await sourceWorkbook.xlsx.load(fileArrayBuf);
         const sourceWorksheet = sourceWorkbook.getWorksheet(1);
         const targetWorksheet = targetWorkbook.addWorksheet('Sheet 1');
-        sourceWorksheet.eachRow(function(row,rowNumber){
-            let targetRow = targetWorksheet.getRow(rowNumber);
-            if(rowNumber === 1){
-                 //to write columns
-                 //setting through targetWorksheet.columns throws an error at writeBuffer
-                for(let i of targetCols){
-                    targetRow.getCell(Number(i.index)).value = i.label;
-                }
+        //setting headers
+        for(let i of targetCols){
+            targetWorksheet.getRow(1).getCell(Number(i.index)).value = i.label;
+        }
+        let currentRow = 2; //this is to select the target file's rows. we already wrote the first row with headers
+        sourceWorksheet.eachRow(function(row,rowNumber){            
+            if(!(rowNumber > 1 && rowSlicer && rowNumber >= rowSlicer.start && rowNumber <= rowSlicer.end)){
+                //skip
+                //here, we skip the header row, and the rows outside the slicer range (if any)
             }
             else{
-                //if not the first row, populate with data from the source
+                let targetRow = targetWorksheet.getRow(currentRow);
                 for(let i in mappings){
                     //initially, this string will hold either the cell value, or an empty string if there is a merge rule
                     let rowData = mappings[i].to === null ? "" : row.getCell(Number(mappings[i].to)).value;
@@ -71,8 +73,9 @@ self.onmessage=async function(event){
                     }
 
                 }
+                targetRow.commit();
+                currentRow += 1;
             }
-            targetRow.commit();
         });
         const buffer = await targetWorkbook.xlsx.writeBuffer();
         self.postMessage({

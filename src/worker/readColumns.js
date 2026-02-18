@@ -4,11 +4,13 @@ self.onmessage=async function(event){
     let fileArrayBuf = await event.data.file.arrayBuffer();
     let headers = [];
     let err = null;
+    let rowCount = 0;
 
     const workbook = new ExcelJs.Workbook();
     try{
         await workbook.xlsx.load(fileArrayBuf);
         const worksheet = workbook.getWorksheet(1);
+        rowCount = worksheet.rowCount;
         worksheet.getRow(1).eachCell({includeEmpty:false},function(cell,colNumber){
             //loading available columns and column labels
             headers.push({
@@ -18,11 +20,6 @@ self.onmessage=async function(event){
                 sample: ""
             });
         });
-        /*
-        worksheet.getRow(2).eachCell({includeEmpty:false},function(cell){
-            headers[headers.length - 1].sample = cell.value; //loading sample data from second row
-        });
-        */
     }
     catch(error){
         err = error;
@@ -30,7 +27,8 @@ self.onmessage=async function(event){
     finally{
         self.postMessage({
             'headers': headers,
-            'error': err
+            'error': err,
+            'rowCount': rowCount
         });
         self.close();
     }
