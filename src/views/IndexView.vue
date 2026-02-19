@@ -3,6 +3,8 @@ import {ref,shallowRef,toRaw} from 'vue';
 import Validator from '@/components/Validator.vue';
 import Merge from '@/components/Merge.vue';
 import Transform from '@/components/Transform.vue';
+import Header from '@/components/Header.vue';
+import ErrorDisplay from '@/components/ErrorDisplay.vue';
 
 const inputCols = ref([]);
 const targetCols = ref([]);
@@ -12,9 +14,11 @@ const totalRows = ref(1);
 const shouldSlice = ref(false);
 const mapping = ref({});
 const isLoading = ref(false);
+const validationErrors = ref({});
 
 // {
 //   "target":{
+//     "isUnique": false,
 //     "to":"source",
 //     "delimiter":"",
 //     "ruleSet":[], //array of objects
@@ -39,12 +43,14 @@ async function onFileLoad(event,inputSource){
           if(inputSource === 'source'){
             sourceFile.value = file;
             inputCols.value = event.data.headers;
+            rowSlicer.value.start = 1;
             rowSlicer.value.end = totalRows.value = event.data.rowCount;
           }
           else{
             targetCols.value = event.data.headers;
             for(let i of targetCols.value){
               mapping.value[i.index]={
+                isUnique: false,
                 to: null,
                 delimiter: "",
                 ruleSet: [],
@@ -62,6 +68,7 @@ async function onFileLoad(event,inputSource){
 }
 function clearMappings(index){
   mapping.value[index]={
+    isUnique: false,
     to: null,
     delimiter: "",
     ruleSet: [],
@@ -104,6 +111,8 @@ async function beginMapping(){
   worker.onmessage = function(event){
     if(event.data.error === null){
       downloadBlob(event.data.buffer,`mapped_file_${Date.now()}.xlsx`);
+      validationErrors.value = event.data.validationErrors;
+      console.log(validationErrors.value);
     }
     else console.log(event.data.error);
     isLoading.value = false;
@@ -114,6 +123,11 @@ async function beginMapping(){
 
 </script>
 <template>
+  <Header/>
+  <div class="text-center py-5">
+    <h2 class="display-6 fw-bold text-primary">Column Mapper</h2>
+    <p class="text-muted">Map values in the source column to the target column</p>
+  </div>
   <div class="container pb-5">
     <section class="mb-5 p-4 bg-light border rounded shadow-sm">
       <h5 class="mb-4">Upload Files</h5>
@@ -154,49 +168,77 @@ async function beginMapping(){
               Select
             </div>
             <div class="card-body bg-white py-5 text-center text-muted gap-2">
-              <div v-if="inputCols.length > 0 && targetCols.length > 0" class="container mt-4">
-                    <div v-for="(targetCol, targetIdx) in targetCols" :key="targetIdx" class="row mb-3 align-items-center border-bottom pb-2">
-                        <div class="col-md-5 fw-bold text-secondary">
-                        {{ targetCol.label }}
-                        </div>
-                        <div class="col-md-6">
-                        <div class="input-group">
-                            <select
-                            v-model="mapping[targetCol.index].to" 
-                            class="form-select"
-                            :class="{ 'border-warning': !mapping[targetCol.index].to }"
-                            :disabled="mapping[targetCol.index].mergeSet.length > 0"
-                            >
-                            <option value="null">-- Select Source Column --</option>
-                            <option 
-                                v-for="col in inputCols" 
-                                :key="col.index"
-                                :value="col.index"
-                            >
-                                {{ col.label }}
-                            </option>
-                            </select>
-                            <button class="btn btn-outline-secondary" type="button" @click="clearMappings(targetCol.index)">
-                            Clear
-                            </button>
-                        </div>
-                        <div class="d-flex gap-1 justify-content-end mt-1">
-                          <Transform v-model="mapping[targetCol.index].transformSet"/>
-                          <Merge v-model:delimiter="mapping[targetCol.index].delim" v-model:mergeList="mapping[targetCol.index].mergeSet" :availableColumns="inputCols"/>
-                          <Validator v-model="mapping[targetCol.index].ruleSet"/>
-                        </div>
-                        </div>
+  <div v-if="inputCols.length > 0 && targetCols.length > 0" class="container mt-4">
+    
+    <div class="row mb-3 pb-2 border-bottom fw-bold text-dark align-items-center">
+      <div class="col-md-4 text-start">Destination Columns</div>
+      <div class="col-md-6 text-start">Source Columns</div>
+      <div class="col-md-2 text-center">Unique?</div>
+    </div>
 
-                    </div>
-                    <button class="btn btn-primary" :disabled="isLoading" @click="beginMapping">
-                      <span v-if="isLoading" class="spinner-border spinner-border-sm me-2" role="status"></span>
-                      {{ isLoading ? 'Processing...' : 'Start Mapping' }}
-                    </button>
-                    </div>
-                <div v-else>
-                    Please upload both source and destination files
-                </div>
-            </div>
+    <div v-for="(targetCol, targetIdx) in targetCols" :key="targetIdx" class="row mb-3 align-items-center border-bottom pb-2">
+      
+      <div class="col-md-4 fw-bold text-secondary text-start">                          
+        {{ targetCol.label }}
+      </div>
+
+      <div class="col-md-6">
+        <div class="input-group">
+          <select
+            v-model="mapping[targetCol.index].to" 
+            class="form-select"
+            :class="{ 'border-warning': !mapping[targetCol.index].to }"
+            :disabled="mapping[targetCol.index].mergeSet.length > 0"
+          >
+            <option :value="null">-- Select Source Column --</option>
+            <option 
+              v-for="col in inputCols" 
+              :key="col.index"
+              :value="col.index"
+            >
+              {{ col.label }}
+            </option>
+          </select>
+          <button class="btn btn-outline-secondary" type="button" @click="clearMappings(targetCol.index)">
+            Clear
+          </button>                            
+        </div>
+        
+        <div class="d-flex gap-1 justify-content-start mt-1">
+          <Transform v-model="mapping[targetCol.index].transformSet"/>
+          <Merge v-model:delimiter="mapping[targetCol.index].delim" v-model:mergeList="mapping[targetCol.index].mergeSet" :availableColumns="inputCols"/>
+          <Validator v-model="mapping[targetCol.index].ruleSet"/>
+        </div>
+      </div>
+
+      <div class="col-md-2 text-center">
+        <div class="form-check d-inline-block">
+          <input 
+            class="form-check-input" 
+            type="checkbox" 
+            v-model="mapping[targetCol.index].isUnique"
+            :id="'unique-' + targetIdx"
+          >
+          <label class="form-check-label small text-muted" :for="'unique-' + targetIdx">
+            Unique
+          </label>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="mt-4">
+      <button class="btn btn-primary btn-lg" :disabled="isLoading" @click="beginMapping">
+        <span v-if="isLoading" class="spinner-border spinner-border-sm me-2" role="status"></span>
+        {{ isLoading ? 'Processing...' : 'Start Mapping' }}
+      </button>
+    </div>
+  </div>
+
+  <div v-else>
+    Please upload both source and destination files
+  </div>
+</div>
           </div>
         </div>
 
@@ -226,6 +268,7 @@ async function beginMapping(){
         </div>
       </div>
     </section>
+    <ErrorDisplay :groupedErrors="validationErrors"/>
   </div>
 </template>
 

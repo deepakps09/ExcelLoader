@@ -6,6 +6,7 @@ import duckdb_wasm from '@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url';
 import mvp_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url';
 import duckdb_wasm_eh from '@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url';
 import eh_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url';
+import Header from '@/components/Header.vue';
 
 const fileA = ref(null);
 const fileB = ref(null);
@@ -18,7 +19,7 @@ const tableHeaders = ref([]);
 let db = null;
 let conn = null;
 
-onMounted(async () => {
+onMounted(async function() {
     const MANUAL_BUNDLES = {
     mvp: {
         mainModule: duckdb_wasm,
@@ -57,13 +58,14 @@ async function getCSVBuf(file) {
       sheetId: 1
     });
     returnVal.csvBuf = new Uint8Array(csvBuf);
+    csvBuf = null;
     return returnVal;
 }
 
 async function handleFileA(event){
     processing.value = true;
     try{
-        fileA.value = event.target.files[0];    
+        fileA.value = event.target.files[0];
         let returnVal = await getCSVBuf(fileA.value);
         tableHeaders.value = returnVal.tableHeaders;
         await db.registerFileBuffer('fileA.csv',returnVal.csvBuf);
@@ -84,11 +86,7 @@ async function handleFileB(event){
     try{
         fileB.value = event.target.files[0];    
         let returnVal = await getCSVBuf(fileB.value);
-        if (returnVal.tableHeaders.length !== tableHeaders.value.length){
-            alert("Columns do not match");
-            fileB.value = null;
-            return;
-        }
+        tableHeaders.value = returnVal.tableHeaders;
         await db.registerFileBuffer('fileB.csv',returnVal.csvBuf);
         await conn.query(`CREATE OR REPLACE TABLE dataB AS SELECT * FROM read_csv_auto('fileB.csv',sample_size=-1,ignore_errors=true)`);
     }
@@ -101,7 +99,8 @@ async function handleFileB(event){
     }
 };
 
-const runComparison = async () => {
+async function runComparison(){
+  statusMessage.value = '';
   processing.value = true;
   try{
     let res = await conn.query(`
@@ -126,34 +125,29 @@ const runComparison = async () => {
     diffResults.value = JSON.parse(JSON.stringify(cleanRows,null,2));
   }
   catch(error){
-
+    alert("Unexpected error occured. Please make sure the columns match");
+    statusMessage.value = error.message;
   }
   finally{
     processing.value = false;
   }
 };
 
-const clearResults = () => {
+function clearResults(){
   diffResults.value = [];
   comparisonDone.value = false;
   statusMessage.value = '';
 };
 
-const getStatusBadgeClass = (type) => {
-  return {
-    'badge rounded-pill bg-success': type === 'Added',
-    'badge rounded-pill bg-danger': type === 'Removed',
-    'badge rounded-pill bg-warning text-dark': type === 'Modified'
-  };
-};
 </script>
 <template>
+  <Header/>
   <div class="container mt-5">
+    <div class="text-center mb-5">
+          <h2 class="display-6 fw-bold text-primary">File Difference</h2>
+          <p class="text-muted">Find differences between rows between two XLSX files</p>
+        </div>
     <div class="card shadow-sm">
-      <div class="card-header bg-primary text-white">
-        <h4 class="mb-0">Data Comparison Tool (DuckDB Powered)</h4>
-      </div>
-      
       <div class="card-body">
         <div class="row g-4">
           <div class="col-md-6">
@@ -208,7 +202,7 @@ const getStatusBadgeClass = (type) => {
               <tbody>
                 <tr v-for="(row, index) in diffResults" :key="index">
                   <td>
-                    <span :class="getStatusBadgeClass(row.diff_type)">
+                    <span>
                       {{ row.diff_type }}
                     </span>
                   </td>

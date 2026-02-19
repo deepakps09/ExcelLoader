@@ -23,7 +23,7 @@ const areRulesValid = computed(function(){
 
 const addRule = () => {
   if (!rules.value) rules.value = [];
-  rules.value.push({ type: 'required', message: '', replacement: '', options: {seed:'', max:'', min:'', locale:'en-IN' } });
+  rules.value.push({ type: 'required', replacement: '', options: {seed:'', max:'', min:'', locale:'en-IN' } });
 };
 
 const removeRule = (index) => {
@@ -94,7 +94,6 @@ const removeRule = (index) => {
                     </div>
 
                     <div class="d-flex gap-1" v-else>
-                      <input type="text" v-model="rule.message" class="form-control form-control-sm" placeholder="Optional error alert">
                       <input type="text" v-model="rule.replacement" class="form-control form-control-sm" placeholder="Optional replacement value">
                     </div>
                   </div>

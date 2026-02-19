@@ -1,4 +1,5 @@
 import validator from 'validator';
+
 export function validateCell(val, rule) {
   let s = "";
   if (val instanceof Date) {

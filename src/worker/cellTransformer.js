@@ -1,4 +1,5 @@
 export function cellTransformer(value,rule){
+    value = String(value);
     switch(rule.type){
         case 'toUpper': return value.toUpperCase();
         case 'toLower': return value.toLowerCase();

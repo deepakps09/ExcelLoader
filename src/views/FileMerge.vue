@@ -6,6 +6,7 @@ import duckdb_wasm from '@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url';
 import mvp_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url';
 import duckdb_wasm_eh from '@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url';
 import eh_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url';
+import Header from '@/components/Header.vue';
 
 // Reactive State
 const selectedFiles = ref([]);
@@ -17,7 +18,7 @@ const showSuccess = ref(false);
 let db = null;
 let conn = null;
 
-onMounted(async () => {
+onMounted(async function(){
     const MANUAL_BUNDLES = {
     mvp: {
         mainModule: duckdb_wasm,
@@ -39,7 +40,7 @@ onMounted(async () => {
 
 const canMerge = computed(() => selectedFiles.value.length > 1 && !isMerging.value);
 async function getCSVBuf(file) {
-    const fileBuf = await file.arrayBuffer();
+    let fileBuf = await file.arrayBuffer();
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(fileBuf);
     const worksheet = workbook.getWorksheet(1);
@@ -58,11 +59,11 @@ async function getCSVBuf(file) {
             }
         }
     });
-    const csvBuf = await workbook.csv.writeBuffer();
+    const csvBuf = await workbook.csv.writeBuffer();    
     return new Uint8Array(csvBuf);
 }
 
-const startMerge = async () => {
+async function startMerge () {
     isMerging.value = true;
     showSuccess.value = false;
     mergeProgress.value = 0;
@@ -72,7 +73,7 @@ const startMerge = async () => {
         for (let i = 0; i < selectedFiles.value.length; i++) {
             const file = selectedFiles.value[i];
             statusMessage.value = `Converting ${file.name}...`;
-            const csvData = await getCSVBuf(file);
+            let csvData = await getCSVBuf(file);
             const virtualName = `file_${i}.csv`;
             await db.registerFileBuffer(virtualName, csvData);
             if (i === 0) {
@@ -106,9 +107,9 @@ const startMerge = async () => {
     }
 };
 
-const exportResults = async (conn) => {    
+async function exportResults(conn){
     await conn.query("COPY merged_data TO 'output.json' (FORMAT JSON, ARRAY TRUE)");
-    const jsonBuffer = await db.copyFileToBuffer('output.json');
+    let jsonBuffer = await db.copyFileToBuffer('output.json');
     const decoder = new TextDecoder('utf-8');
     let jsonData = JSON.parse(decoder.decode(jsonBuffer));
 
@@ -120,6 +121,7 @@ const exportResults = async (conn) => {
         key: key
     }));
     worksheet.addRows(jsonData);
+    jsonBuffer = null;
     
     const xlsxbuf = await workbook.xlsx.writeBuffer();
     
@@ -133,32 +135,33 @@ const exportResults = async (conn) => {
 };
 
 // UI Helpers
-const handleFileSelection = (event) => {
+function handleFileSelection(event){
     selectedFiles.value = Array.from(event.target.files);
     showSuccess.value = false;
     mergeProgress.value = 0;
 };
 
-const reset = () => {
+function reset(){
     selectedFiles.value = [];
     showSuccess.value = false;
     statusMessage.value = '';
     mergeProgress.value = 0;
 };
 
-const removeFile = (index) => {
+function removeFile(index){
     selectedFiles.value.splice(index,1);
 }
 </script>
 
 <template>
+  <Header/>
   <div class="container py-5">
     <div class="row justify-content-center">
       <div class="col-lg-8">
         
         <div class="text-center mb-5">
-          <h2 class="display-6 fw-bold text-primary">Table Merger</h2>
-          <p class="text-muted">Combine multiple XLSX files into a single dataset using DuckDB</p>
+          <h2 class="display-6 fw-bold text-primary">File Merger</h2>
+          <p class="text-muted">Combine multiple XLSX files into a single one</p>
         </div>
 
         <div class="card shadow-sm border-0">

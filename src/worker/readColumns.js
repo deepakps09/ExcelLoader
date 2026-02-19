@@ -10,7 +10,7 @@ self.onmessage=async function(event){
     try{
         await workbook.xlsx.load(fileArrayBuf);
         const worksheet = workbook.getWorksheet(1);
-        rowCount = worksheet.rowCount;
+        rowCount = worksheet.actualRowCount;
         worksheet.getRow(1).eachCell({includeEmpty:false},function(cell,colNumber){
             //loading available columns and column labels
             headers.push({

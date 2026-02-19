@@ -6,6 +6,7 @@ import duckdb_wasm from '@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url';
 import mvp_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url';
 import duckdb_wasm_eh from '@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url';
 import eh_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url';
+import Header from '@/components/Header.vue';
 
 // State
 const loading = ref(false);
@@ -17,7 +18,7 @@ let db = null;
 let conn = null;
 let data = null;
 
-onMounted(async () => {
+onMounted(async function() {
     const MANUAL_BUNDLES = {
     mvp: {
         mainModule: duckdb_wasm,
@@ -38,7 +39,7 @@ onMounted(async () => {
   isDbReady.value = true;
 });
 
-const handleFileUpload = async (event) => {
+async function handleFileUpload(event){
   const file = event.target.files[0];
   if (!file) return;
 
@@ -73,7 +74,7 @@ const handleFileUpload = async (event) => {
   }
 };
 
-const runQuery = async () => {
+async function runQuery(){
   if (!conn) return;
   try {
     let res = await conn.query(query.value);
@@ -121,11 +122,12 @@ async function saveFile(){
 </script>
 
 <template>
+  <Header/>
   <div class="container mt-5">
-    <header class="mb-4">
-      <h1 class="display-5 fw-bold text-primary">DuckDB + Vue Excel Explorer</h1>
-      <p class="text-muted">Upload an Excel/CSV file and query it with SQL locally.</p>
-    </header>
+    <div class="text-center mb-5">
+      <h2 class="display-6 fw-bold text-primary">File Query</h2>
+      <p class="text-muted">Load and query an XLSX file with SQL commands</p>
+    </div>
 
     <div class="row g-4">
       <div class="col-md-4">

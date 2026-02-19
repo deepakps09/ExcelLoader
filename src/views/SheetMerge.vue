@@ -6,6 +6,7 @@ import duckdb_wasm from '@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url';
 import mvp_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url';
 import duckdb_wasm_eh from '@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url';
 import eh_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url';
+import Header from '@/components/Header.vue';
 
 let db = null;
 let conn = null;
@@ -43,7 +44,7 @@ onMounted(async () => {
   conn = await db.connect();
 });
 
-const handleFileUpload = async (event) => {
+async function handleFileUpload(event){
   const uploadedFile = event.target.files[0];
   if (!uploadedFile) return;
 
@@ -67,7 +68,7 @@ const handleFileUpload = async (event) => {
   }
 };
 
-const startMerge = async () => {
+async function startMerge(){
   isMerging.value = true;
   try{  
     console.log("Merging these sheets:", selectedSheets.value.map(s => s.name));
@@ -89,9 +90,10 @@ const startMerge = async () => {
         csvBuf = null;
     }
     await conn.query("COPY merged TO 'output.json' (FORMAT JSON, ARRAY TRUE)");
-    const jsonBuffer = await db.copyFileToBuffer('output.json');
+    let jsonBuffer = await db.copyFileToBuffer('output.json');
     const decoder = new TextDecoder('utf-8');
     let jsonData = JSON.parse(decoder.decode(jsonBuffer));
+    jsonBuffer = null;
 
     const newWorkbook = new ExcelJS.Workbook();
     const newWorksheet = newWorkbook.addWorksheet('Sheet 1');
@@ -121,13 +123,14 @@ const startMerge = async () => {
 </script>
 
 <template>
+  <Header/>
   <div class="container py-5">
     <div class="row justify-content-center">
       <div class="col-lg-10">
         
-        <div class="mb-4">
-          <h2 class="fw-bold"><i class="bi bi-layers-half me-2"></i>Merge Worksheets</h2>
-          <p class="text-muted">Combine multiple tabs from a single Excel file into one table.</p>
+        <div class="text-center mb-5">
+          <h2 class="display-6 fw-bold text-primary">Sheet Merger</h2>
+          <p class="text-muted">Combine multiple XLSX sheets into a single one</p>
         </div>
 
         <div class="card shadow-sm mb-4">
