@@ -5,6 +5,7 @@ import Merge from '@/components/Merge.vue';
 import Transform from '@/components/Transform.vue';
 import Header from '@/components/Header.vue';
 import ErrorDisplay from '@/components/ErrorDisplay.vue';
+import {startMerge} from '../worker/fileMerge';
 
 const inputCols = ref([]);
 const targetCols = ref([]);
@@ -12,9 +13,11 @@ const sourceFile = shallowRef(null);
 const rowSlicer = ref({start:1,end:2});
 const totalRows = ref(1);
 const shouldSlice = ref(false);
+const shouldMergeSheets = ref(false);
 const mapping = ref({});
 const isLoading = ref(false);
 const validationErrors = ref({});
+const configInputField = ref(null);
 
 // {
 //   "target":{
@@ -29,10 +32,14 @@ const validationErrors = ref({});
 // }
 
 //read column names
-async function onFileLoad(event,inputSource){
+async function onFileLoad(e,inputSource){
     //here, we extract the columns
-    let file = event.target.files[0];
     isLoading.value = true;
+    let file = null;
+    if(inputSource === 'source' && e.target.files.length > 1){
+      file = await startMerge({mergeSheets: 'true', value: e.target.files}); //here, we require all rows, for setting the maximum row limit
+    }
+    else file = await e.target.files[0].arrayBuffer();
     if(file){
       const worker = new Worker(new URL('../worker/readColumns.js', import.meta.url),{type: 'module'});
       const payload = {
@@ -40,7 +47,7 @@ async function onFileLoad(event,inputSource){
       }
       worker.onmessage = function(event){
         if(event.data.error === null){
-          if(inputSource === 'source'){
+          if(inputSource === 'source'){    
             sourceFile.value = file;
             inputCols.value = event.data.headers;
             rowSlicer.value.start = 1;
@@ -76,11 +83,6 @@ function clearMappings(index){
     transformSet: []
   }
 }
-function sliceCheckboxHandler(event){
-  console.log(event.target.checked);
-  shouldSlice.value = event.target.checked;
-}
-
 function getColumnDetails(idx,colType) {
   //converting idx to string due to datatype mismatch, depending on whether idx is a key or a value in an object
   if(colType === 'target') return targetCols.value.find(c => String(c.index) === String(idx)) || { label: 'Unknown', letter: '?' };
@@ -99,12 +101,45 @@ function downloadBlob(buffer, filename) {
   document.body.removeChild(link);
   window.URL.revokeObjectURL(url);
 }
+function saveConfig(){
+  const mappingConfig = {
+    shouldSlice: shouldSlice.value,
+    rowSlicer: toRaw(rowSlicer.value),
+    mapping: toRaw(mapping.value)
+  };
+  const jsonString = JSON.stringify(mappingConfig);
+  const encoder = new TextEncoder();
+  downloadBlob(encoder.encode(jsonString).buffer,'MappingConfig.json');
+
+}
+function loadConfig(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const rawText = e.target.result;
+      const mappingConfig = JSON.parse(rawText);      
+      if(mappingConfig.shouldSlice){
+        shouldSlice.value = mappingConfig.shouldSlice;
+        rowSlicer.value.start = mappingConfig.rowSlicer.start;
+        rowSlicer.value.end = mappingConfig.rowSlicer.end;
+      }
+      mapping.value = mappingConfig.mapping;
+    } catch (error) {
+      console.error("Error parsing JSON:", error);
+      mapping.value.length = 0;
+    }
+  };
+  reader.readAsText(file);
+};
+
 async function beginMapping(){
   isLoading.value = true;
   const worker = new Worker(new URL('../worker/processRows.js', import.meta.url),{type: 'module'});
   const payload = {
     mappings: toRaw(mapping.value),
-    file: sourceFile.value,
+    fileArrayBuf: sourceFile.value,
     targetCols: toRaw(targetCols.value),
     rowSlicer: shouldSlice ? toRaw(rowSlicer.value) : null
   }
@@ -112,13 +147,14 @@ async function beginMapping(){
     if(event.data.error === null){
       downloadBlob(event.data.buffer,`mapped_file_${Date.now()}.xlsx`);
       validationErrors.value = event.data.validationErrors;
-      console.log(validationErrors.value);
     }
-    else console.log(event.data.error);
+    else{
+      console.log(event.data.error);
+      alert("error. please ensure that both the xlsx files, and the mappings are valid ");
+    }
     isLoading.value = false;
   }
   worker.postMessage(payload);
-  
 }
 
 </script>
@@ -134,7 +170,7 @@ async function beginMapping(){
       <div class="row">
         <div class="col-md-6 mb-3">
           <label for="fileLeft" class="form-label fw-bold">Source file</label>
-          <input class="form-control" @change="onFileLoad($event,'source')" type="file">
+          <input class="form-control" @change="onFileLoad($event,'source')" type="file" multiple>
         </div>
         
         <div class="col-md-6 mb-3">
@@ -145,7 +181,11 @@ async function beginMapping(){
       <div class="row">
         <div class="col-md-6">
           Slice / Select subset:
-          <input type="checkbox" @change="sliceCheckboxHandler($event)"/>
+          <input type="checkbox" :checked="shouldSlice" @change="()=>shouldSlice = !shouldSlice"/>
+        </div>
+        <div class="col-md-6">
+          Merge sheets?:
+          <input type="checkbox" :checked="shouldMergeSheets" @change="()=>shouldMergeSheets = !shouldMergeSheets"/>
         </div>
         <template v-if="shouldSlice">
           <div class="col-md-3">
@@ -224,7 +264,11 @@ async function beginMapping(){
           </label>
         </div>
       </div>
-
+    </div>
+    <div class="mt-1 d-flex gap-1">
+      <button type="button" class="btn btn-primary" @click="saveConfig">Save config</button>
+      <input ref="configInputField" type="file" style="display:none" accept=".json" @change="loadConfig"/>
+      <button type="button" class="btn btn-primary" @click="()=>configInputField.click()">Load config</button>
     </div>
 
     <div class="mt-4">

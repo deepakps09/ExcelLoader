@@ -1,7 +1,7 @@
 import ExcelJs from 'exceljs';
 
 self.onmessage=async function(event){
-    let fileArrayBuf = await event.data.file.arrayBuffer();
+    let fileArrayBuf = event.data.file;
     let headers = [];
     let err = null;
     let rowCount = 0;

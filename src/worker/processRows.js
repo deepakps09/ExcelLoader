@@ -3,7 +3,7 @@ import { validateCell } from './ruleValidator';
 import { cellTransformer } from './cellTransformer';
 
 self.onmessage=async function(event){    
-    let fileArrayBuf = await event.data.file.arrayBuffer();
+    let fileArrayBuf = event.data.fileArrayBuf;;
     let mappings = event.data.mappings;
     let targetCols = event.data.targetCols;
     let rowSlicer = event.data.rowSlicer;

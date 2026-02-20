@@ -10,11 +10,6 @@ const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
-      path:'/',
-      name:'index',
-      component: IndexView
-    },
-    {
       path:'/query-file',
       name:'query_file',
       component: QueryExcel
@@ -33,6 +28,11 @@ const router = createRouter({
       path:'/merge-sheet',
       name:'merge_sheet',
       component: SheetMerge
+    },
+    {
+      path:'/',
+      name:'index',
+      component: IndexView
     }
   ],
 });

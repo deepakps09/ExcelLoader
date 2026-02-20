@@ -81,7 +81,7 @@ function downloadErrorList(){
 </script>
 <template>
   <div class="card border-danger shadow-sm mt-4">
-    <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+    <div class="card-header text-white d-flex justify-content-between align-items-center" :class="{'bg-danger':totalErrorCount > 0}">
       <h6 class="mb-0">Validation Report</h6>
       <span class="badge bg-white text-danger">{{ totalErrorCount }} Total Issues</span>
     </div>
