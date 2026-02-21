@@ -48,7 +48,7 @@ async function getCSVBuf(file) {
         csvBuf: null,
         tableHeaders: null
     };
-    const fileBuf = await file.arrayBuffer();
+    let fileBuf = await file.arrayBuffer();
     const excelWorkbook = new ExcelJs.Workbook();
     await excelWorkbook.xlsx.load(fileBuf);
     const worksheet = excelWorkbook.getWorksheet(1);

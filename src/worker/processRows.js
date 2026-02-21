@@ -27,7 +27,7 @@ self.onmessage=async function(event){
             targetWorksheet.getRow(1).getCell(Number(i.index)).value = i.label;
         }
         let currentRow = 2; //this is to select the target file's subsequent rows. we already wrote the first row with headers
-        sourceWorksheet.eachRow(function(row,rowNumber){            
+        sourceWorksheet.eachRow(function(row,rowNumber){
             if(!(rowNumber > 1 && rowSlicer && rowNumber >= rowSlicer.start && rowNumber <= rowSlicer.end)){
                 //skip
                 //here, we skip the header row, and the rows outside the slicer range (if any)
@@ -35,6 +35,7 @@ self.onmessage=async function(event){
             else{
                 let targetRow = targetWorksheet.getRow(currentRow);
                 for(let i in mappings){
+                    const targetCell = targetRow.getCell(Number(i));
                     //initially, this string will hold either the cell value, or an empty string if there is a merge rule
                     let rowData = mappings[i].to === null ? "" : row.getCell(Number(mappings[i].to)).value;
 
@@ -61,6 +62,8 @@ self.onmessage=async function(event){
                             const isValid = validateCell(rowData, rule);
                             if(!isValid){
                                 if(rule.replacement.trim() !== '') rowData = rule.replacement;
+                                //marking validation failures as red cells
+                                targetCell.fill = {type: 'pattern',pattern: 'solid',fgColor: { argb: 'FFFFC7CE' },};
                                 currentErrors.push({
                                     column: i,
                                     type: rule.type,
@@ -69,12 +72,8 @@ self.onmessage=async function(event){
                             }
                         });
                     }
-                    //we write the string into the target cell, and mark it as red in the case of any validation failure
-                    const targetCell = targetRow.getCell(Number(i));
+                    //we write the string into the target cell
                     targetCell.value = rowData;
-                    if(currentErrors.length > 0){
-                        targetCell.fill = {type: 'pattern',pattern: 'solid',fgColor: { argb: 'FFFFC7CE' },};                        
-                    }
 
                     //uniqueness criteria, mark as yellow if cell is a duplicate
                     if(mappings[i].isUnique){
@@ -91,9 +90,8 @@ self.onmessage=async function(event){
                     
                     //push all errors into the global error array
                     if(currentErrors.length > 0) valErrors[rowNumber] = [...currentErrors];
-
                 }
-                currentErrors.length = 0; //clearing the current validation error array after pushing to the global error array, reset for the next iteration
+                currentErrors=[]; //clearing the current validation error array after pushing to the global error array, reset for the next iteration
                 targetRow.commit();
                 currentRow += 1;
             }

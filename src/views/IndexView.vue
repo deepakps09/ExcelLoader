@@ -5,7 +5,6 @@ import Merge from '@/components/Merge.vue';
 import Transform from '@/components/Transform.vue';
 import Header from '@/components/Header.vue';
 import ErrorDisplay from '@/components/ErrorDisplay.vue';
-import {startMerge} from '../worker/fileMerge';
 
 const inputCols = ref([]);
 const targetCols = ref([]);
@@ -32,12 +31,28 @@ const configInputField = ref(null);
 // }
 
 //read column names
+function runMergeWorker(fileList) {
+    return new Promise((resolve, reject) => {
+      const worker = new Worker(new URL('../worker/fileMerge.js', import.meta.url),{type: 'module'});
+        worker.onmessage = (event) => {
+            resolve(event.data.mergedFile);
+            worker.terminate();
+        };
+        worker.onerror = (err) => {
+            reject(err);
+            worker.terminate();
+        };
+        worker.postMessage({
+            selectedFiles: fileList
+        });
+    });
+}
 async function onFileLoad(e,inputSource){
     //here, we extract the columns
     isLoading.value = true;
     let file = null;
     if(inputSource === 'source' && e.target.files.length > 1){
-      file = await startMerge({mergeSheets: 'true', value: e.target.files}); //here, we require all rows, for setting the maximum row limit
+      file = await runMergeWorker({mergeSheets: 'true', value: e.target.files}); //here, we require all rows, for setting the maximum row limit
     }
     else file = await e.target.files[0].arrayBuffer();
     if(file){

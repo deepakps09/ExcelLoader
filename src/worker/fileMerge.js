@@ -127,4 +127,10 @@ async function startMerge(selectedFiles) {
     }
 }
 
-export { startMerge };
+self.onmessage = async function(event){
+  let mergedFile = await startMerge(event.data.selectedFiles);
+  self.postMessage({
+    mergedFile: mergedFile
+  });
+}
+
